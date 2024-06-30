@@ -2,6 +2,7 @@ import numpy as np
 import csv
 import matplotlib.pyplot as plt
 from scipy.stats import norm
+from scipy.special import expit  
 
 class AeroTask:
     def __init__(self, task_id, duration):
@@ -12,16 +13,38 @@ class AeroTask:
         return f"Task({self.task_id}, Duration: {self.duration} min)"
 
 class AeroTaskGenerator:
-    def __init__(self, num_tasks, mean, std_dev):
+    def __init__(self, num_tasks, mean, std_dev, function_type='normal', **kwargs):
         self.num_tasks = num_tasks
-        self.mean = mean
-        self.std_dev = std_dev
+        
+        if function_type == 'normal':
+            self.normal_mean = mean
+            self.normal_std_dev = std_dev
+        elif function_type == 'gaussian':
+            self.gaussian_mean = mean
+            self.gaussian_std_dev = std_dev
+            self.gaussian_sigma = kwargs.get('sigma', 1.0)
+        elif function_type == 'sigmoid':
+            self.sigmoid_center = mean
+            self.sigmoid_scale = std_dev
+        else:
+            raise ValueError(f"Unsupported function type: {function_type}")
+        
+        self.function_type = function_type
         self.tasks = []
         self.task_limits = []
 
     def generate_histogram_function(self):
         x = np.arange(1, self.num_tasks + 1)
-        y = norm.pdf(x, loc=self.mean, scale=self.std_dev)
+        
+        if self.function_type == 'normal':
+            y = norm.pdf(x, loc=self.normal_mean, scale=self.normal_std_dev)
+        elif self.function_type == 'gaussian':
+            y = np.exp(-((x - self.gaussian_mean) ** 2 / (2 * self.gaussian_sigma ** 2)))
+        elif self.function_type == 'sigmoid':
+            y = expit((x - self.sigmoid_center) / self.sigmoid_scale)
+        else:
+            raise ValueError(f"Unsupported function type: {self.function_type}")
+
         y = y / max(y) * 30
         self.task_limits = np.floor(y).astype(int) 
 
@@ -75,18 +98,47 @@ class AeroTaskGenerator:
         plt.show()
 
 if __name__ == "__main__":
-    num_tasks = 10
-    mean_task_number = 5
-    std_dev_task_number = 2
+    num_tasks = 15
+    
+    #Normal distribution
+    normal_mean = 7
+    normal_std_dev = 4
+    generator_normal = AeroTaskGenerator(num_tasks, normal_mean, normal_std_dev, function_type='normal')
+    generator_normal.generate_histogram_function()
+    generator_normal.generate_tasks()
+    generator_normal.save_tasks_to_csv("tasks_normal.csv")
+    generator_normal.load_tasks_from_csv("tasks_normal.csv")
+    generator_normal.plot_histogram_function()
+    generator_normal.plot_tasks_with_histogram()
 
-    generator = AeroTaskGenerator(num_tasks, mean_task_number, std_dev_task_number)
-    generator.generate_histogram_function()
-    generator.generate_tasks()
-    generator.save_tasks_to_csv("tasks.csv")
-    generator.load_tasks_from_csv("tasks.csv")
+    for task in generator_normal.tasks:
+        print(task)
 
-    generator.plot_histogram_function()
-    generator.plot_tasks_with_histogram()
+    #Gaussian function
+    gaussian_mean = 7
+    gaussian_std_dev = 3
+    gaussian_sigma = 2.0
+    generator_gaussian = AeroTaskGenerator(num_tasks, gaussian_mean, gaussian_std_dev, function_type='gaussian', sigma=gaussian_sigma)
+    generator_gaussian.generate_histogram_function()
+    generator_gaussian.generate_tasks()
+    generator_gaussian.save_tasks_to_csv("tasks_gaussian.csv")
+    generator_gaussian.load_tasks_from_csv("tasks_gaussian.csv")
+    generator_gaussian.plot_histogram_function()
+    generator_gaussian.plot_tasks_with_histogram()
 
-    for task in generator.tasks:
+    for task in generator_gaussian.tasks:
+        print(task)
+
+    #Sigmoid function
+    sigmoid_center = 5
+    sigmoid_scale = 1
+    generator_sigmoid = AeroTaskGenerator(num_tasks, sigmoid_center, sigmoid_scale, function_type='sigmoid')
+    generator_sigmoid.generate_histogram_function()
+    generator_sigmoid.generate_tasks()
+    generator_sigmoid.save_tasks_to_csv("tasks_sigmoid.csv")
+    generator_sigmoid.load_tasks_from_csv("tasks_sigmoid.csv")
+    generator_sigmoid.plot_histogram_function()
+    generator_sigmoid.plot_tasks_with_histogram()
+
+    for task in generator_sigmoid.tasks:
         print(task)
