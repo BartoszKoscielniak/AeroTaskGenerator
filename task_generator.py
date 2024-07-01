@@ -105,21 +105,21 @@ class AeroTaskGenerator:
         plt.show()
 
 if __name__ == "__main__":
-    num_tasks = int(input("Enter the number of tasks: "))
-    function_type = input("Enter the function type (normal, gaussian, sigmoid): ")
+    num_tasks = int(input("Enter the number of tasks(e.g. 15): "))
+    function_type = input("Enter the function type (e.g. normal, gaussian, sigmoid): ")
     
     if function_type == 'normal':
-        mean = float(input("Enter the mean: "))
-        std_dev = float(input("Enter the standard deviation: "))
+        mean = float(input("Enter the mean (e.g. 7): "))
+        std_dev = float(input("Enter the standard deviation(e.g. 4): "))
         generator = AeroTaskGenerator(num_tasks, mean, std_dev, function_type=function_type)
     elif function_type == 'gaussian':
-        mean = float(input("Enter the mean: "))
-        std_dev = float(input("Enter the standard deviation: "))
-        sigma = float(input("Enter the sigma: "))
+        mean = float(input("Enter the mean(e.g. 7): "))
+        std_dev = float(input("Enter the standard deviation(e.g. 3): "))
+        sigma = float(input("Enter the sigma(e.g. 2.0): "))
         generator = AeroTaskGenerator(num_tasks, mean, std_dev, function_type=function_type, sigma=sigma)
     elif function_type == 'sigmoid':
-        center = float(input("Enter the center: "))
-        scale = float(input("Enter the scale: "))
+        center = float(input("Enter the center(e.g. 5): "))
+        scale = float(input("Enter the scale(e.g. 1): "))
         generator = AeroTaskGenerator(num_tasks, center, scale, function_type=function_type)
     else:
         raise ValueError("Unsupported function type.")
