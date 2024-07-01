@@ -2,12 +2,12 @@ import numpy as np
 import csv
 import matplotlib.pyplot as plt
 from scipy.stats import norm
-from scipy.special import expit  
+from scipy.special import expit
 
 class AeroTask:
     def __init__(self, task_id, duration):
         self.task_id = task_id
-        self.duration = duration
+        self.duration = int(np.floor(duration))
 
     def __repr__(self):
         return f"Task({self.task_id}, Duration: {self.duration} min)"
@@ -32,6 +32,8 @@ class AeroTaskGenerator:
         self.function_type = function_type
         self.tasks = []
         self.task_limits = []
+        self.task_matrix = None
+        self.max_duration = 30
 
     def generate_histogram_function(self):
         x = np.arange(1, self.num_tasks + 1)
@@ -45,14 +47,19 @@ class AeroTaskGenerator:
         else:
             raise ValueError(f"Unsupported function type: {self.function_type}")
 
-        y = y / max(y) * 30
+        y = y / max(y) * self.max_duration
         self.task_limits = np.floor(y).astype(int) 
 
     def generate_tasks(self):
         self.tasks = []
+        self.task_matrix = np.zeros((self.num_tasks, self.max_duration))
+        
         for task_id in range(1, self.num_tasks + 1):
             max_duration_minutes = self.task_limits[task_id - 1]
-            duration = max_duration_minutes  
+            self.task_matrix[task_id - 1, :max_duration_minutes] = 1
+        
+        for task_id in range(1, self.num_tasks + 1):
+            duration = np.sum(self.task_matrix[task_id - 1, :])
             task = AeroTask(task_id, duration)
             self.tasks.append(task)
 
@@ -69,7 +76,7 @@ class AeroTaskGenerator:
             reader = csv.reader(file)
             next(reader)
             for row in reader:
-                task_id, duration = int(row[0]), int(row[1])
+                task_id, duration = int(row[0]), int(np.floor(float(row[1])))
                 self.tasks.append(AeroTask(task_id, duration))
 
     def plot_histogram_function(self):
@@ -98,47 +105,32 @@ class AeroTaskGenerator:
         plt.show()
 
 if __name__ == "__main__":
-    num_tasks = 15
+    num_tasks = int(input("Enter the number of tasks: "))
+    function_type = input("Enter the function type (normal, gaussian, sigmoid): ")
     
-    #Normal distribution
-    normal_mean = 7
-    normal_std_dev = 4
-    generator_normal = AeroTaskGenerator(num_tasks, normal_mean, normal_std_dev, function_type='normal')
-    generator_normal.generate_histogram_function()
-    generator_normal.generate_tasks()
-    generator_normal.save_tasks_to_csv("tasks_normal.csv")
-    generator_normal.load_tasks_from_csv("tasks_normal.csv")
-    generator_normal.plot_histogram_function()
-    generator_normal.plot_tasks_with_histogram()
+    if function_type == 'normal':
+        mean = float(input("Enter the mean: "))
+        std_dev = float(input("Enter the standard deviation: "))
+        generator = AeroTaskGenerator(num_tasks, mean, std_dev, function_type=function_type)
+    elif function_type == 'gaussian':
+        mean = float(input("Enter the mean: "))
+        std_dev = float(input("Enter the standard deviation: "))
+        sigma = float(input("Enter the sigma: "))
+        generator = AeroTaskGenerator(num_tasks, mean, std_dev, function_type=function_type, sigma=sigma)
+    elif function_type == 'sigmoid':
+        center = float(input("Enter the center: "))
+        scale = float(input("Enter the scale: "))
+        generator = AeroTaskGenerator(num_tasks, center, scale, function_type=function_type)
+    else:
+        raise ValueError("Unsupported function type.")
 
-    for task in generator_normal.tasks:
-        print(task)
+    generator.generate_histogram_function()
+    generator.generate_tasks()
+    filename = f"tasks_{function_type}.csv"
+    generator.save_tasks_to_csv(filename)
+    generator.load_tasks_from_csv(filename)
+    generator.plot_histogram_function()
+    generator.plot_tasks_with_histogram()
 
-    #Gaussian function
-    gaussian_mean = 7
-    gaussian_std_dev = 3
-    gaussian_sigma = 2.0
-    generator_gaussian = AeroTaskGenerator(num_tasks, gaussian_mean, gaussian_std_dev, function_type='gaussian', sigma=gaussian_sigma)
-    generator_gaussian.generate_histogram_function()
-    generator_gaussian.generate_tasks()
-    generator_gaussian.save_tasks_to_csv("tasks_gaussian.csv")
-    generator_gaussian.load_tasks_from_csv("tasks_gaussian.csv")
-    generator_gaussian.plot_histogram_function()
-    generator_gaussian.plot_tasks_with_histogram()
-
-    for task in generator_gaussian.tasks:
-        print(task)
-
-    #Sigmoid function
-    sigmoid_center = 5
-    sigmoid_scale = 1
-    generator_sigmoid = AeroTaskGenerator(num_tasks, sigmoid_center, sigmoid_scale, function_type='sigmoid')
-    generator_sigmoid.generate_histogram_function()
-    generator_sigmoid.generate_tasks()
-    generator_sigmoid.save_tasks_to_csv("tasks_sigmoid.csv")
-    generator_sigmoid.load_tasks_from_csv("tasks_sigmoid.csv")
-    generator_sigmoid.plot_histogram_function()
-    generator_sigmoid.plot_tasks_with_histogram()
-
-    for task in generator_sigmoid.tasks:
+    for task in generator.tasks:
         print(task)
