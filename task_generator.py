@@ -57,7 +57,7 @@ class AeroTaskGenerator:
         elif func == 'butterworth':
             y = self.butterworth(self.task_times, **params)
         else:
-            raise ValueError("Unsupported function. Use 'sigmoid', 'gauss', 'exponential', 'beta', 'normal', 'lognormal', 'triangular', or 'butterworth'.")
+            raise ValueError("Unsupported function. Use 'sigmoid', 'gauss', 'exponential', 'lognormal', or 'butterworth'.")
 
         # Normalizuje tablice wartosci aby uzyskac rozklad prawdopodobienstwa wystapienia zadania z okreslonym czasem trwania
         hist_func = y / np.sum(y)
@@ -107,6 +107,20 @@ class AeroTaskGenerator:
         tasks = [Task(row['Task ID'], row['Duration']) for _, row in df.iterrows()]
         return tasks
 
+    def get_task_summary(self, tasks):
+        durations = [task.duration for task in tasks]
+        unique, counts = np.unique(durations, return_counts=True)
+        task_summary = pd.DataFrame({'Duration': unique, 'Number of Tasks': counts})
+        task_summary['Value %'] = round(task_summary['Number of Tasks'] / self.num_tasks * 100, 2)
+        return task_summary
+
+    def save_summary_to_csv(self, summary, filename):
+        summary.to_csv(filename, index=False)
+
+    def read_summary_from_csv(self, filename):
+        summary = pd.read_csv(filename)
+        return summary
+
 # Klasa GUI
 class TaskGeneratorApp:
     def __init__(self, root):
@@ -136,10 +150,13 @@ class TaskGeneratorApp:
         ttk.Button(self.frame, text="Load Tasks from CSV", command=self.load_tasks_from_csv).grid(column=0, row=4, columnspan=2, sticky=(tk.W, tk.E))
         ttk.Button(self.frame, text="Save Tasks to CSV", command=self.save_tasks_to_csv).grid(column=0, row=5, columnspan=2, sticky=(tk.W, tk.E))
         ttk.Button(self.frame, text="Plot Distribution", command=self.plot_distribution).grid(column=0, row=6, columnspan=2, sticky=(tk.W, tk.E))
-        ttk.Button(self.frame, text="Exit", command=self.root.quit).grid(column=0, row=7, columnspan=2, sticky=(tk.W, tk.E))
+        ttk.Button(self.frame, text="Show Task Summary", command=self.show_task_summary).grid(column=0, row=7, columnspan=2, sticky=(tk.W, tk.E))
+        ttk.Button(self.frame, text="Save Summary to CSV", command=self.save_summary_to_csv).grid(column=0, row=8, columnspan=2, sticky=(tk.W, tk.E))
+        ttk.Button(self.frame, text="Load Summary from CSV", command=self.load_summary_from_csv).grid(column=0, row=9, columnspan=2, sticky=(tk.W, tk.E))
+        ttk.Button(self.frame, text="Exit", command=self.root.quit).grid(column=0, row=10, columnspan=2, sticky=(tk.W, tk.E))
 
         self.task_list = tk.Text(self.frame, height=15, width=50)
-        self.task_list.grid(column=0, row=8, columnspan=2, sticky=(tk.W, tk.E))
+        self.task_list.grid(column=0, row=11, columnspan=2, sticky=(tk.W, tk.E))
 
     # Generowanie zadan na podstawie wprowadzonych parametrow
     def generate_tasks(self):
@@ -205,6 +222,30 @@ class TaskGeneratorApp:
             messagebox.showerror("Error", "No tasks to plot.")
             return
         self.generator.plot_distribution(self.tasks, self.hist_func, self.function_type.get())
+
+    def show_task_summary(self):
+        if not hasattr(self, 'tasks') or not self.tasks:
+            messagebox.showerror("Error", "No tasks to summarize.")
+            return
+        summary = self.generator.get_task_summary(self.tasks)
+        self.summary_list.delete(1.0, tk.END)
+        self.summary_list.insert(tk.END, summary.to_string(index=False))
+
+    def save_summary_to_csv(self):
+        if not hasattr(self, 'tasks') or not self.tasks:
+            messagebox.showerror("Error", "No tasks to summarize.")
+            return
+        summary = self.generator.get_task_summary(self.tasks)
+        filename = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+        if filename:
+            self.generator.save_summary_to_csv(summary, filename)
+
+    def load_summary_from_csv(self):
+        filename = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        if filename:
+            summary = self.generator.read_summary_from_csv(filename)
+            self.summary_list.delete(1.0, tk.END)
+            self.summary_list.insert(tk.END, summary.to_string(index=False))
 
 # Uruchomienie aplikacji
 if __name__ == "__main__":
