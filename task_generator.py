@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.signal import butter, lfilter
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from tkinter.simpledialog import askfloat
@@ -13,11 +12,20 @@ class Task:
         self.duration = duration
 
 class AeroTaskGenerator:
-    def __init__(self, num_tasks=1000, max_task_time=30):
+    def __init__(self, num_tasks=1000, max_task_time=30, func='sigmoid', a1=1, b1=0, a2=1, b2=0, mu=15, sigma=5, lambda_=1, cutoff=0.5, order=2):
         self.num_tasks = num_tasks
         self.max_task_time = max_task_time
-        # Tworzymy ndarray z wartosciami [1, 2, ..., 30]
         self.task_times = np.arange(1, max_task_time + 1)
+        self.func = func
+        self.a1 = a1
+        self.b1 = b1
+        self.a2 = a2
+        self.b2 = b2
+        self.mu = mu
+        self.sigma = sigma
+        self.lambda_ = lambda_
+        self.cutoff = cutoff
+        self.order = order
 
     # Funkcja sigmoid
     def sigmoid(self, x, a=1, b=0):
@@ -29,7 +37,6 @@ class AeroTaskGenerator:
 
     # Funkcja Gaussa
     def gauss(self, x, mu=15, sigma=5):
-        # np.exp oblicza funkcje wykladnicza elementow tablicy
         return np.exp(-0.5 * ((x - mu) / sigma) ** 2)
 
     # Funkcja wykładnicza
@@ -51,29 +58,23 @@ class AeroTaskGenerator:
         return np.maximum(sigmoid_1, inverted_sigmoid_2)
 
     # Generowanie zadan na podstawie wybranego rozkladu
-    def generate_tasks(self, func='sigmoid', **params):
-        if func == 'sigmoid':
-            y = self.sigmoid(self.task_times, **params)
-        elif func == 'gauss':
-            y = self.gauss(self.task_times, **params)
-        elif func == 'exponential':
-            y = self.exponential(self.task_times, **params)
-        elif func == 'lognormal':
-            y = self.lognormal(self.task_times, **params)
-        elif func == 'butterworth':
-            y = self.butterworth(self.task_times, **params)
-        elif func == 'bandpass':
-            y = self.bandpass(self.task_times, **params)
+    def generate_tasks(self):
+        if self.func == 'sigmoid':
+            y = self.sigmoid(self.task_times, self.a1, self.b1)
+        elif self.func == 'gauss':
+            y = self.gauss(self.task_times, self.mu, self.sigma)
+        elif self.func == 'exponential':
+            y = self.exponential(self.task_times, self.lambda_)
+        elif self.func == 'lognormal':
+            y = self.lognormal(self.task_times, self.mu, self.sigma)
+        elif self.func == 'butterworth':
+            y = self.butterworth(self.task_times, self.cutoff, self.order)
+        elif self.func == 'bandpass':
+            y = self.bandpass(self.task_times, self.a1, self.b1, self.a2, self.b2)
         else:
             raise ValueError("Unsupported function. Use 'sigmoid', 'gauss', 'exponential', 'lognormal', 'butterworth', or 'bandpass'.")
 
-        # Normalizuje tablice wartosci aby uzyskac rozklad prawdopodobienstwa wystapienia zadania z okreslonym czasem trwania
         hist_func = y / np.sum(y)
-
-        # Generowanie czasów trwania zadan na podstawie rozkładu
-        # self.task_times tablica mozliwych czasow trwania zadan
-        # self.num_tasks liczba zadan do wygenerowania
-        # hist_func okresla rozklad prawdopodobienstwa wyboru czasu trwania zadania
         task_durations = np.random.choice(self.task_times, self.num_tasks, p=hist_func)
         tasks = [Task(i + 1, duration) for i, duration in enumerate(task_durations)]
         return tasks, hist_func
@@ -103,17 +104,47 @@ class AeroTaskGenerator:
         plt.tight_layout()
         plt.show()
 
-    # Zapisanie zadan do pliku CSV
+    # Zapisanie zadan do pliku CSV wraz z parametrami
     def save_tasks_to_csv(self, tasks, filename):
-        data = {'Task ID': [task.id for task in tasks], 'Duration': [task.duration for task in tasks]}
+        data = {
+            'Task ID': [task.id for task in tasks],
+            'Duration': [task.duration for task in tasks]
+        }
         df = pd.DataFrame(data)
         df.to_csv(filename, index=False)
+        with open(filename, 'a') as f:
+            f.write(f"\nnum_tasks,{self.num_tasks}\n")
+            f.write(f"max_task_time,{self.max_task_time}\n")
+            f.write(f"func,{self.func}\n")
+            f.write(f"a1,{self.a1}\n")
+            f.write(f"b1,{self.b1}\n")
+            f.write(f"a2,{self.a2}\n")
+            f.write(f"b2,{self.b2}\n")
+            f.write(f"mu,{self.mu}\n")
+            f.write(f"sigma,{self.sigma}\n")
+            f.write(f"lambda_,{self.lambda_}\n")
+            f.write(f"cutoff,{self.cutoff}\n")
+            f.write(f"order,{self.order}\n")
 
-    # Odczytanie zadan z pliku CSV
+    # Odczytanie zadan z pliku CSV wraz z parametrami
     def read_tasks_from_csv(self, filename):
         df = pd.read_csv(filename)
-        tasks = [Task(row['Task ID'], row['Duration']) for _, row in df.iterrows()]
-        return tasks
+        task_df = df.iloc[:-12]
+        params_df = df.iloc[-12:]
+        
+        tasks = [Task(int(row['Task ID']), int(row['Duration'])) for _, row in task_df.iterrows()]
+        params = {}
+        for _, row in params_df.iterrows():
+            key, value = row.iloc[0], row.iloc[1]
+            if key == 'func':
+                params[key] = value
+            elif(key == 'num_tasks' or key == 'max_task_time'):
+                params[key] = int(value)
+            else:
+                params[key] = float(value)
+        
+        return tasks, params
+
 
     def get_task_summary(self, tasks):
         durations = [task.duration for task in tasks]
@@ -182,38 +213,42 @@ class TaskGeneratorApp:
         num_tasks = int(self.num_tasks.get())
         function_type = self.function_type.get()
 
-        self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30)
-
         if function_type == 'gaussian':
             mu = askfloat("Input", "Enter the mu (e.g., 15):")
             sigma = askfloat("Input", "Enter the sigma (e.g., 5):")
-            self.tasks, self.hist_func = self.generator.generate_tasks(func='gauss', mu=mu, sigma=sigma)
+            self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='gauss', mu=mu, sigma=sigma)
+            self.tasks, self.hist_func = self.generator.generate_tasks()
 
         elif function_type == 'sigmoid':
             a = askfloat("Input", "Enter the a (e.g., 0.5):")
             b = askfloat("Input", "Enter the b (e.g., 15):")
-            self.tasks, self.hist_func = self.generator.generate_tasks(func='sigmoid', a=a, b=b)
+            self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='sigmoid', a1=a, b1=b)
+            self.tasks, self.hist_func = self.generator.generate_tasks()
 
         elif function_type == 'exponential':
             lambda_ = askfloat("Input", "Enter the lambda (e.g., 1):")
-            self.tasks, self.hist_func = self.generator.generate_tasks(func='exponential', lambda_=lambda_)
+            self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='exponential', lambda_=lambda_)
+            self.tasks, self.hist_func = self.generator.generate_tasks()
 
         elif function_type == 'lognormal':
             mu = askfloat("Input", "Enter the mu (e.g., 0):")
             sigma = askfloat("Input", "Enter the sigma (e.g., 1):")
-            self.tasks, self.hist_func = self.generator.generate_tasks(func='lognormal', mu=mu, sigma=sigma)
+            self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='lognormal', mu=mu, sigma=sigma)
+            self.tasks, self.hist_func = self.generator.generate_tasks()
 
         elif function_type == 'butterworth':
             cutoff = askfloat("Input", "Enter the cutoff frequency (e.g., 0.5):")
             order = askfloat("Input", "Enter the filter order (e.g., 2):")
-            self.tasks, self.hist_func = self.generator.generate_tasks(func='butterworth', cutoff=cutoff, order=order)
+            self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='butterworth', cutoff=cutoff, order=order)
+            self.tasks, self.hist_func = self.generator.generate_tasks()
 
         elif function_type == 'bandpass':
             a1 = askfloat("Input", "Enter the a1 (e.g., 1):")
             b1 = askfloat("Input", "Enter the b1 (e.g., 15):")
             a2 = askfloat("Input", "Enter the a2 (e.g., 1):")
             b2 = askfloat("Input", "Enter the b2 (e.g., 15):")
-            self.tasks, self.hist_func = self.generator.generate_tasks(func='bandpass', a1=a1, b1=b1, a2=a2, b2=b2)
+            self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='bandpass', a1=a1, b1=b1, a2=a2, b2=b2)
+            self.tasks, self.hist_func = self.generator.generate_tasks()
 
         else:
             messagebox.showerror("Error", "Unsupported function type.")
@@ -239,7 +274,9 @@ class TaskGeneratorApp:
     def load_tasks_from_csv(self):
         filename = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         if filename:
-            self.tasks = self.generator.read_tasks_from_csv(filename)
+            self.tasks, params = self.generator.read_tasks_from_csv(filename)
+            self.generator = AeroTaskGenerator(**params)
+            self.hist_func = self.generator.generate_tasks()[1]
             self.display_tasks()
 
     # Wizualizacja rozkladu zadan
