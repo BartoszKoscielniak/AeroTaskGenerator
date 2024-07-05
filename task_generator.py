@@ -16,16 +16,20 @@ class AeroTaskGenerator:
     def __init__(self, num_tasks=1000, max_task_time=30):
         self.num_tasks = num_tasks
         self.max_task_time = max_task_time
-        #Tworzymy ndarray z wartosciami [1, 2, ..., 30]
+        # Tworzymy ndarray z wartosciami [1, 2, ..., 30]
         self.task_times = np.arange(1, max_task_time + 1)
 
     # Funkcja sigmoid
     def sigmoid(self, x, a=1, b=0):
         return 1 / (1 + np.exp(-a * (x - b)))
 
+    # Funkcja sigmoid odwrócona
+    def inverted_sigmoid(self, x, a=1, b=0):
+        return ((1 / (1 + np.exp(-a * (x - b)))) - 1) * (-1)
+
     # Funkcja Gaussa
     def gauss(self, x, mu=15, sigma=5):
-        #np.exp oblicza funkcje wykladnicza elementow tablicy
+        # np.exp oblicza funkcje wykladnicza elementow tablicy
         return np.exp(-0.5 * ((x - mu) / sigma) ** 2)
 
     # Funkcja wykładnicza
@@ -38,11 +42,13 @@ class AeroTaskGenerator:
 
     # Funkcja Butterwortha
     def butterworth(self, x, cutoff=0.5, order=2):
-        nyq = 0.5 * len(x)
-        normal_cutoff = cutoff / nyq
-        b, a = butter(order, normal_cutoff, btype='low', analog=False)
-        y = lfilter(b, a, x)
-        return y
+        return 1 / (1 + (x / cutoff)**(2*order))
+
+    # Funkcja środkowo przepustowa
+    def bandpass(self, x, a1=1, b1=0, a2=1, b2=0):
+        sigmoid_1 = self.sigmoid(x, a1, b1)
+        inverted_sigmoid_2 = self.inverted_sigmoid(x, a2, b2)
+        return np.maximum(sigmoid_1, inverted_sigmoid_2)
 
     # Generowanie zadan na podstawie wybranego rozkladu
     def generate_tasks(self, func='sigmoid', **params):
@@ -56,8 +62,10 @@ class AeroTaskGenerator:
             y = self.lognormal(self.task_times, **params)
         elif func == 'butterworth':
             y = self.butterworth(self.task_times, **params)
+        elif func == 'bandpass':
+            y = self.bandpass(self.task_times, **params)
         else:
-            raise ValueError("Unsupported function. Use 'sigmoid', 'gauss', 'exponential', 'lognormal', or 'butterworth'.")
+            raise ValueError("Unsupported function. Use 'sigmoid', 'gauss', 'exponential', 'lognormal', 'butterworth', or 'bandpass'.")
 
         # Normalizuje tablice wartosci aby uzyskac rozklad prawdopodobienstwa wystapienia zadania z okreslonym czasem trwania
         hist_func = y / np.sum(y)
@@ -141,7 +149,7 @@ class TaskGeneratorApp:
 
         ttk.Label(self.frame, text="Function Type:").grid(column=0, row=1, sticky=tk.W)
         self.function_type = tk.StringVar()
-        ttk.Combobox(self.frame, textvariable=self.function_type, values=["sigmoid", "gaussian", "exponential", "lognormal", "butterworth"]).grid(column=1, row=1, sticky=(tk.W, tk.E))
+        ttk.Combobox(self.frame, textvariable=self.function_type, values=["sigmoid", "gaussian", "exponential", "lognormal", "butterworth", "bandpass"]).grid(column=1, row=1, sticky=(tk.W, tk.E))
 
         self.parameter_frame = ttk.Frame(self.frame, padding="10")
         self.parameter_frame.grid(column=0, row=2, columnspan=2, sticky=(tk.W, tk.E))
@@ -157,6 +165,17 @@ class TaskGeneratorApp:
 
         self.task_list = tk.Text(self.frame, height=15, width=50)
         self.task_list.grid(column=0, row=11, columnspan=2, sticky=(tk.W, tk.E))
+
+        task_scrollbar = ttk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.task_list.yview)
+        self.task_list['yscrollcommand'] = task_scrollbar.set
+        task_scrollbar.grid(column=2, row=11, sticky=(tk.N, tk.S))
+
+        self.summary_list = tk.Text(self.frame, height=15, width=50)
+        self.summary_list.grid(column=0, row=12, columnspan=2, sticky=(tk.W, tk.E))
+
+        summary_scrollbar = ttk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.summary_list.yview)
+        self.summary_list['yscrollcommand'] = summary_scrollbar.set
+        summary_scrollbar.grid(column=2, row=12, sticky=(tk.N, tk.S))
 
     # Generowanie zadan na podstawie wprowadzonych parametrow
     def generate_tasks(self):
@@ -188,6 +207,13 @@ class TaskGeneratorApp:
             cutoff = askfloat("Input", "Enter the cutoff frequency (e.g., 0.5):")
             order = askfloat("Input", "Enter the filter order (e.g., 2):")
             self.tasks, self.hist_func = self.generator.generate_tasks(func='butterworth', cutoff=cutoff, order=order)
+
+        elif function_type == 'bandpass':
+            a1 = askfloat("Input", "Enter the a1 (e.g., 1):")
+            b1 = askfloat("Input", "Enter the b1 (e.g., 15):")
+            a2 = askfloat("Input", "Enter the a2 (e.g., 1):")
+            b2 = askfloat("Input", "Enter the b2 (e.g., 15):")
+            self.tasks, self.hist_func = self.generator.generate_tasks(func='bandpass', a1=a1, b1=b1, a2=a2, b2=b2)
 
         else:
             messagebox.showerror("Error", "Unsupported function type.")
