@@ -52,16 +52,16 @@ class AeroTaskGenerator:
         return 1 / (1 + (x / cutoff)**(2*order))
 
     # Funkcja środkowo przepustowa
-    def bandpass(self, x, a1=1, b1=0, a2=15):
+    def bandpass(self, x, a1=1, b1=0, bandwidth=15):
         sigmoid_1 = self.sigmoid(x, a1, b1)
-        inverted_sigmoid_2 = self.inverted_sigmoid(x, a1, b1 + a2)
+        inverted_sigmoid_2 = self.inverted_sigmoid(x, a1, b1 + bandwidth)
         return np.minimum(sigmoid_1, inverted_sigmoid_2)
 
     # Funkcja środkowo zaporowa
-    def bandstop(self, x, a1=1, b1=0, a2=15):
+    def bandstop(self, x, a1=1, b1=0, bandwidth=15):
         sigmoid_1 = self.sigmoid(x, a1, b1)
-        inverted_sigmoid_2 = self.inverted_sigmoid(x, a1, b1 + a2)
-        return np.maximum(sigmoid_1, inverted_sigmoid_2)
+        inverted_sigmoid_2 = self.inverted_sigmoid(x, a1, b1 + bandwidth)
+        return 1 - np.minimum(sigmoid_1, inverted_sigmoid_2)
 
     # Generowanie zadan na podstawie wybranego rozkladu
     def generate_tasks(self):
@@ -252,14 +252,14 @@ class TaskGeneratorApp:
 
         elif function_type == 'bandpass':
             a1 = askfloat("Input", "Enter the a (e.g., 1):")
-            b1 = askfloat("Input", "Enter the b (e.g., 15):")
+            b1 = askfloat("Input", "Enter the b (e.g., 8):")
             a2 = askfloat("Input", "Enter the bandwidth (e.g., 15):")
             self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='bandpass', a1=a1, b1=b1, a2=a2)
             self.tasks, self.hist_func = self.generator.generate_tasks()
 
         elif function_type == 'bandstop':
             a1 = askfloat("Input", "Enter the a (e.g., 1):")
-            b1 = askfloat("Input", "Enter the b (e.g., 15):")
+            b1 = askfloat("Input", "Enter the b (e.g., 8):")
             a2 = askfloat("Input", "Enter the bandwidth (e.g., 15):")
             self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='bandstop', a1=a1, b1=b1, a2=a2)
             self.tasks, self.hist_func = self.generator.generate_tasks()
