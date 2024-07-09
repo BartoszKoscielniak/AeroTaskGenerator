@@ -52,9 +52,15 @@ class AeroTaskGenerator:
         return 1 / (1 + (x / cutoff)**(2*order))
 
     # Funkcja środkowo przepustowa
-    def bandpass(self, x, a1=1, b1=0, a2=1, b2=0):
+    def bandpass(self, x, a1=1, b1=0, a2=15):
         sigmoid_1 = self.sigmoid(x, a1, b1)
-        inverted_sigmoid_2 = self.inverted_sigmoid(x, a2, b2)
+        inverted_sigmoid_2 = self.inverted_sigmoid(x, a1, b1 + a2)
+        return np.minimum(sigmoid_1, inverted_sigmoid_2)
+
+    # Funkcja środkowo zaporowa
+    def bandstop(self, x, a1=1, b1=0, a2=15):
+        sigmoid_1 = self.sigmoid(x, a1, b1)
+        inverted_sigmoid_2 = self.inverted_sigmoid(x, a1, b1 + a2)
         return np.maximum(sigmoid_1, inverted_sigmoid_2)
 
     # Generowanie zadan na podstawie wybranego rozkladu
@@ -70,9 +76,11 @@ class AeroTaskGenerator:
         elif self.func == 'butterworth':
             y = self.butterworth(self.task_times, self.cutoff, self.order)
         elif self.func == 'bandpass':
-            y = self.bandpass(self.task_times, self.a1, self.b1, self.a2, self.b2)
+            y = self.bandpass(self.task_times, self.a1, self.b1, self.a2)
+        elif self.func == 'bandstop':
+            y = self.bandstop(self.task_times, self.a1, self.b1, self.a2)
         else:
-            raise ValueError("Unsupported function. Use 'sigmoid', 'gauss', 'exponential', 'lognormal', 'butterworth', or 'bandpass'.")
+            raise ValueError("Unsupported function. Use 'sigmoid', 'gauss', 'exponential', 'lognormal', 'butterworth', 'bandstop' or 'bandpass'.")
 
         hist_func = y / np.sum(y)
         task_durations = np.random.choice(self.task_times, self.num_tasks, p=hist_func)
@@ -180,7 +188,7 @@ class TaskGeneratorApp:
 
         ttk.Label(self.frame, text="Function Type:").grid(column=0, row=1, sticky=tk.W)
         self.function_type = tk.StringVar()
-        ttk.Combobox(self.frame, textvariable=self.function_type, values=["sigmoid", "gaussian", "exponential", "lognormal", "butterworth", "bandpass"]).grid(column=1, row=1, sticky=(tk.W, tk.E))
+        ttk.Combobox(self.frame, textvariable=self.function_type, values=["sigmoid", "gaussian", "exponential", "lognormal", "butterworth", "bandpass", "bandstop"]).grid(column=1, row=1, sticky=(tk.W, tk.E))
 
         self.parameter_frame = ttk.Frame(self.frame, padding="10")
         self.parameter_frame.grid(column=0, row=2, columnspan=2, sticky=(tk.W, tk.E))
@@ -243,11 +251,17 @@ class TaskGeneratorApp:
             self.tasks, self.hist_func = self.generator.generate_tasks()
 
         elif function_type == 'bandpass':
-            a1 = askfloat("Input", "Enter the a1 (e.g., 1):")
-            b1 = askfloat("Input", "Enter the b1 (e.g., 15):")
-            a2 = askfloat("Input", "Enter the a2 (e.g., 1):")
-            b2 = askfloat("Input", "Enter the b2 (e.g., 15):")
-            self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='bandpass', a1=a1, b1=b1, a2=a2, b2=b2)
+            a1 = askfloat("Input", "Enter the a (e.g., 1):")
+            b1 = askfloat("Input", "Enter the b (e.g., 15):")
+            a2 = askfloat("Input", "Enter the bandwidth (e.g., 15):")
+            self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='bandpass', a1=a1, b1=b1, a2=a2)
+            self.tasks, self.hist_func = self.generator.generate_tasks()
+
+        elif function_type == 'bandstop':
+            a1 = askfloat("Input", "Enter the a (e.g., 1):")
+            b1 = askfloat("Input", "Enter the b (e.g., 15):")
+            a2 = askfloat("Input", "Enter the bandwidth (e.g., 15):")
+            self.generator = AeroTaskGenerator(num_tasks=num_tasks, max_task_time=30, func='bandstop', a1=a1, b1=b1, a2=a2)
             self.tasks, self.hist_func = self.generator.generate_tasks()
 
         else:
